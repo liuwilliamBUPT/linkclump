@@ -1,269 +1,396 @@
-var settingsManager = new SettingsManager();
-
-Array.prototype.unique = function () {
-  var a = [];
-  var l = this.length;
-  for (var i = 0; i < l; i++) {
-    for (var j = i + 1; j < l; j++) {
-      if (this[i].url === this[j].url) j = ++i;
-    }
-    a.push(this[i]);
-  }
-  return a;
-};
-
+// 将 openTab 函数移到顶层作用域
 function openTab(urls, delay, windowId, openerTabId, tabPosition, closeTime) {
-  const obj = {
-    windowId,
-    url: urls.shift().url,
-    active: false,
+  return new Promise((resolve) => {
+    const obj = {
+      windowId,
+      url: urls[0].url,
+      active: false,
+    };
+
+    if (!delay) {
+      obj.openerTabId = openerTabId;
+    }
+
+    if (tabPosition != null) {
+      obj.index = tabPosition;
+    }
+
+    chrome.tabs.create(obj, (tab) => {
+      if (closeTime > 0) {
+        setTimeout(() => {
+          chrome.tabs.remove(tab.id);
+        }, closeTime * 1000);
+      }
+
+      const remainingUrls = urls.slice(1);
+      if (remainingUrls.length > 0) {
+        setTimeout(() => {
+          openTab(remainingUrls, delay, windowId, openerTabId, tabPosition + 1, closeTime)
+            .then(resolve);
+        }, delay * 1000);
+      } else {
+        resolve();
+      }
+    });
+  });
+}
+
+(async () => {
+  // 常量定义
+  const CopyFormat = {
+    URLS_WITH_TITLES: 0,
+    URLS_ONLY: 1,
+    URLS_ONLY_SPACE_SEPARATED: 2,
+    TITLES_ONLY: 3,
+    AS_LINK_HTML: 4,
+    AS_LIST_LINK_HTML: 5,
+    AS_MARKDOWN: 6,
   };
 
-  // only add tab ID if delay feature is not being used as if tab with openerTabId is closed, the links stop opening
-  if (!delay) {
-    obj.openerTabId = openerTabId;
-  }
+  // 工具函数
+  const uniqueUrls = (urls) => {
+    const seen = new Set();
+    return urls.filter(({ url }) => {
+      if (seen.has(url)) return false;
+      seen.add(url);
+      return true;
+    });
+  };
 
-  if (tabPosition != null) {
-    obj.index = tabPosition;
-    tabPosition++;
-  }
+  const pad = (number, length) => String(number).padStart(length, '0');
 
-  chrome.tabs.create(obj, function (tab) {
-    if (closeTime > 0) {
-      window.setTimeout(function () {
-        chrome.tabs.remove(tab.id);
-      }, closeTime * 1000);
+  const timeConverter = (date) => {
+    const year = date.getFullYear();
+    const month = pad(date.getMonth() + 1, 2);
+    const day = pad(date.getDate(), 2);
+    const hour = pad(date.getHours(), 2);
+    const min = pad(date.getMinutes(), 2);
+    const sec = pad(date.getSeconds(), 2);
+    return `${year}-${month}-${day} ${hour}:${min}:${sec}`;
+  };
+
+  const formatLink = ({ url, title }, copyFormat) => {
+    switch (parseInt(copyFormat)) {
+      case CopyFormat.URLS_WITH_TITLES:
+        return `${title}\t${url}\n`;
+      case CopyFormat.URLS_ONLY:
+        return `${url}\n`;
+      case CopyFormat.URLS_ONLY_SPACE_SEPARATED:
+        return `${url} `;
+      case CopyFormat.TITLES_ONLY:
+        return `${title}\n`;
+      case CopyFormat.AS_LINK_HTML:
+        return `<a href="${url}">${title}</a>\n`;
+      case CopyFormat.AS_LIST_LINK_HTML:
+        return `<li><a href="${url}">${title}</a></li>\n`;
+      case CopyFormat.AS_MARKDOWN:
+        return `[${title}](${url})\n`;
     }
+  };
+
+  // SettingsManager 类定义
+  class SettingsManager {
+    load() {
+      return new Promise((resolve) => {
+        chrome.storage.local.get(['settings'], (result) => {
+          try {
+            resolve(result.settings ? JSON.parse(result.settings) : this.init());
+          } catch (error) {
+            const settings = this.init();
+            settings.error = `Error: ${error}`;
+            resolve(settings);
+          }
+        });
+      });
+    }
+
+    save(settings) {
+      return new Promise((resolve) => {
+        if (settings.error !== undefined) {
+          delete settings.error;
+        }
+        chrome.storage.local.set({ settings: JSON.stringify(settings) }, resolve);
+      });
+    }
+
+    isInit() {
+      return new Promise((resolve) => {
+        chrome.storage.local.get(['version'], (result) => {
+          resolve(result.version !== undefined);
+        });
+      });
+    }
+
+    isLatest() {
+      return new Promise((resolve) => {
+        chrome.storage.local.get(['version'], (result) => {
+          resolve(result.version === '6');
+        });
+      });
+    }
+
+    init() {
+      const settings = {
+        actions: {
+          101: {
+            mouse: 0,
+            key: 90,
+            action: 'tabs',
+            color: '#FFA500',
+            options: {
+              smart: 0,
+              ignore: [0],
+              delay: 0,
+              close: 0,
+              block: true,
+              reverse: false,
+              end: false,
+            },
+          },
+        },
+        blocked: [],
+      };
+
+      chrome.storage.local.set({
+        settings: JSON.stringify(settings),
+        version: '6'
+      });
+
+      return settings;
+    }
+
+    update() {
+      return this.isInit().then(isInit => {
+        if (!isInit) {
+          return this.init();
+        }
+      });
+    }
+  }
+
+  // 创建实例
+  const settingsManager = new SettingsManager();
+
+  // 其他函数定义
+  const copyToClipboard = async (text) => {
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+    } catch (err) {
+      console.error('Failed to copy text:', err);
+    }
+  };
+
+  const handleRequests = async (request, sender, callback) => {
+    switch (request.message) {
+      case 'activate': {
+        if (request.setting.options.block) {
+          request.urls = uniqueUrls(request.urls);
+        }
+
+        if (request.urls.length === 0) return;
+
+        if (request.setting.options.reverse) {
+          request.urls.reverse();
+        }
+
+        handleAction(request, sender).then(() => {
+          callback({ success: true });
+        }).catch(error => {
+          console.error('Action handling failed:', error);
+          callback({ success: false, error: error.message });
+        });
+
+        return true;
+      }
+
+      case 'init':
+        settingsManager.load().then(settings => {
+          callback(settings);
+        }).catch(error => {
+          console.error('Failed to load settings:', error);
+          callback({ error: error.message });
+        });
+        return true;
+
+      case 'update':
+        settingsManager.save(request.settings).then(() => {
+          return chrome.windows.getAll({ populate: true });
+        }).then(windows => {
+          const updatePromises = windows.flatMap(window =>
+            window.tabs.map(tab =>
+              settingsManager.load().then(settings =>
+                chrome.tabs.sendMessage(tab.id, {
+                  message: 'update',
+                  settings
+                }).catch(() => {/* 忽略发送失败的标签页 */})
+              )
+            )
+          );
+          return Promise.all(updatePromises);
+        }).then(() => {
+          callback({ success: true });
+        }).catch(error => {
+          console.error('Update failed:', error);
+          callback({ success: false, error: error.message });
+        });
+        return true;
+
+      default:
+        callback({ error: 'Unknown message type' });
+        return false;
+    }
+  };
+
+  // 注册事件监听器
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    const response = handleRequests(request, sender, sendResponse);
+    if (response instanceof Promise) {
+      response.catch(console.error);
+      return true;
+    }
+    return false;
   });
 
-  if (urls.length > 0) {
-    window.setTimeout(function () {
-      openTab(urls, delay, windowId, openerTabId, tabPosition, closeTime);
-    }, delay * 1000);
-  }
-}
-
-function copyToClipboard(text) {
-  var copyDiv = document.createElement('textarea');
-  copyDiv.contentEditable = true;
-  document.body.appendChild(copyDiv);
-  copyDiv.innerHTML = text;
-  copyDiv.unselectable = 'off';
-  copyDiv.focus();
-  document.execCommand('SelectAll');
-  document.execCommand('Copy', false, null);
-  document.body.removeChild(copyDiv);
-}
-
-function pad(number, length) {
-  var str = '' + number;
-  while (str.length < length) {
-    str = '0' + str;
-  }
-
-  return str;
-}
-
-function timeConverter(a) {
-  var year = a.getFullYear();
-  var month = pad(a.getMonth() + 1, 2);
-  var day = pad(a.getDate(), 2);
-  var hour = pad(a.getHours(), 2);
-  var min = pad(a.getMinutes(), 2);
-  var sec = pad(a.getSeconds(), 2);
-  var time =
-    year + '-' + month + '-' + day + ' ' + hour + ':' + min + ':' + sec;
-  return time;
-}
-
-// Link copy formats
-const URLS_WITH_TITLES = 0;
-const URLS_ONLY = 1;
-const URLS_ONLY_SPACE_SEPARATED = 2;
-const TITLES_ONLY = 3;
-const AS_LINK_HTML = 4;
-const AS_LIST_LINK_HTML = 5;
-const AS_MARKDOWN = 6;
-
-function formatLink({ url, title }, copyFormat) {
-  switch (parseInt(copyFormat)) {
-    case URLS_WITH_TITLES:
-      return title + '\t' + url + '\n';
-    case URLS_ONLY:
-      return url + '\n';
-    case URLS_ONLY_SPACE_SEPARATED:
-      return url + ' ';
-    case TITLES_ONLY:
-      return title + '\n';
-    case AS_LINK_HTML:
-      return '<a href="' + url + '">' + title + '</a>\n';
-    case AS_LIST_LINK_HTML:
-      return '<li><a href="' + url + '">' + title + '</a></li>\n';
-    case AS_MARKDOWN:
-      return '[' + title + '](' + url + ')\n';
-  }
-}
-
-function handleRequests(request, sender, callback) {
-  switch (request.message) {
-    case 'activate':
-      if (request.setting.options.block) {
-        request.urls = request.urls.unique();
-      }
-
-      if (request.urls.length === 0) {
-        return;
-      }
-
-      if (request.setting.options.reverse) {
-        request.urls.reverse();
-      }
-
-      switch (request.setting.action) {
-        case 'copy':
-          var text = '';
-          for (let i = 0; i < request.urls.length; i++) {
-            text += formatLink(request.urls[i], request.setting.options.copy);
+  chrome.runtime.onInstalled.addListener(() => {
+    console.log('Extension installed');
+    settingsManager.isInit().then(isInit => {
+      if (!isInit) {
+        settingsManager.init();
+        // ... 其他初始化代码 ...
+      } else {
+        settingsManager.isLatest().then(isLatest => {
+          if (!isLatest) {
+            settingsManager.update();
           }
-
-          if (request.setting.options.copy == AS_LIST_LINK_HTML) {
-            text = '<ul>\n' + text + '</ul>\n';
-          }
-
-          copyToClipboard(text);
-          break;
-        case 'bm':
-          chrome.bookmarks.getTree(function (bookmarkTreeNodes) {
-            // make assumption that bookmarkTreeNodes[0].children[1] refers to the "other bookmarks" folder
-            // as different languages will not use the english name to refer to the folder
-            chrome.bookmarks.create(
-              {
-                parentId: bookmarkTreeNodes[0].children[1].id,
-                title: 'Linkclump ' + timeConverter(new Date()),
-              },
-              function (newFolder) {
-                for (let j = 0; j < request.urls.length; j++) {
-                  chrome.bookmarks.create({
-                    parentId: newFolder.id,
-                    title: request.urls[j].title,
-                    url: request.urls[j].url,
-                  });
-                }
-              }
-            );
-          });
-
-          break;
-        case 'win':
-          chrome.windows.getCurrent(function (currentWindow) {
-            chrome.windows.create(
-              {
-                url: request.urls.shift().url,
-                focused: !request.setting.options.unfocus,
-              },
-              function (window) {
-                if (request.urls.length > 0) {
-                  openTab(
-                    request.urls,
-                    request.setting.options.delay,
-                    window.id,
-                    undefined,
-                    null,
-                    0
-                  );
-                }
-              }
-            );
-
-            if (request.setting.options.unfocus) {
-              chrome.windows.update(currentWindow.id, { focused: true });
-            }
-          });
-          break;
-        case 'tabs':
-          chrome.tabs.get(sender.tab.id, function (tab) {
-            chrome.windows.getCurrent(function (window) {
-              var tab_index = null;
-
-              if (!request.setting.options.end) {
-                tab_index = tab.index + 1;
-              }
-
-              openTab(
-                request.urls,
-                request.setting.options.delay,
-                window.id,
-                tab.id,
-                tab_index,
-                request.setting.options.close
-              );
-            });
-          });
-          break;
-      }
-
-      break;
-    case 'init':
-      callback(settingsManager.load());
-      break;
-    case 'update':
-      settingsManager.save(request.settings);
-
-      chrome.windows.getAll(
-        {
-          populate: true,
-        },
-        function (windowList) {
-          windowList.forEach(function (window) {
-            window.tabs.forEach(function (tab) {
-              chrome.tabs.sendMessage(
-                tab.id,
-                {
-                  message: 'update',
-                  settings: settingsManager.load(),
-                },
-                null
-              );
-            });
-          });
-        }
-      );
-
-      break;
-  }
-}
-
-chrome.extension.onMessage.addListener(handleRequests);
-
-if (!settingsManager.isInit()) {
-  // initialize settings manager with defaults and to stop this appearing again
-  settingsManager.init();
-
-  // inject Linkclump into windows currently open to make it just work
-  chrome.windows.getAll({ populate: true }, function (windows) {
-    for (var i = 0; i < windows.length; ++i) {
-      for (var j = 0; j < windows[i].tabs.length; ++j) {
-        if (!/^https?:\/\//.test(windows[i].tabs[j].url)) continue;
-        chrome.tabs.executeScript(windows[i].tabs[j].id, {
-          file: 'linkclump.js',
         });
       }
-    }
+    });
   });
 
-  // pop up window to show tour and options page
-  chrome.windows.create({
-    url:
-      document.location.protocol +
-      '//' +
-      document.location.host +
-      '/pages/options.html?init=true',
-    width: 800,
-    height: 850,
-    left: screen.width / 2 - 800 / 2,
-    top: screen.height / 2 - 700 / 2,
-  });
-} else if (!settingsManager.isLatest()) {
-  settingsManager.update();
+  // 初始化逻辑
+  if (!(await settingsManager.isInit())) {
+    await settingsManager.init();
+
+    const windows = await chrome.windows.getAll({ populate: true });
+    await Promise.all(
+      windows.flatMap(window =>
+        window.tabs
+          .filter(tab => /^https?:\/\//.test(tab.url))
+          .map(tab =>
+            chrome.scripting.executeScript({
+              target: { tabId: tab.id },
+              files: ['linkclump.js'],
+              injectImmediately: true
+            }).catch(err => console.error(`Failed to inject into tab ${tab.id}:`, err))
+          )
+      )
+    );
+
+    // 使用 chrome.runtime.getURL 获取完整路径
+    const optionsUrl = chrome.runtime.getURL('pages/options.html?init=true');
+
+    // 获取屏幕尺寸
+    const width = 800;
+    const height = 850;
+    const left = Math.max(0, Math.floor((window.screen.width - width) / 2));
+    const top = Math.max(0, Math.floor((window.screen.height - height) / 2));
+
+    await chrome.windows.create({
+      url: optionsUrl,
+      type: 'popup',
+      width,
+      height,
+      left,
+      top
+    });
+  } else if (!(await settingsManager.isLatest())) {
+    await settingsManager.update();
+  }
+})().catch(err => {
+  console.error('Service Worker initialization failed:', err);
+});
+
+// 处理不同动作的辅助函数
+async function handleAction(request, sender) {
+  switch (request.setting.action) {
+    case 'copy': {
+      const text = request.urls
+        .map(url => formatLink(url, request.setting.options.copy))
+        .join('');
+
+      const finalText = request.setting.options.copy === CopyFormat.AS_LIST_LINK_HTML
+        ? `<ul>\n${text}</ul>\n`
+        : text;
+
+      await copyToClipboard(finalText);
+      break;
+    }
+
+    case 'bm': {
+      const bookmarkTree = await chrome.bookmarks.getTree();
+      const folder = await chrome.bookmarks.create({
+        parentId: bookmarkTree[0].children[1].id,
+        title: `Linkclump ${timeConverter(new Date())}`,
+      });
+
+      await Promise.all(request.urls.map(({ title, url }) =>
+        chrome.bookmarks.create({
+          parentId: folder.id,
+          title,
+          url,
+        })
+      ));
+      break;
+    }
+
+    case 'win': {
+      const currentWindow = await chrome.windows.getCurrent();
+      const [firstUrl, ...remainingUrls] = request.urls;
+
+      const newWindow = await chrome.windows.create({
+        url: firstUrl.url,
+        focused: !request.setting.options.unfocus,
+      });
+
+      if (remainingUrls.length > 0) {
+        await openTab(
+          remainingUrls,
+          request.setting.options.delay,
+          newWindow.id,
+          undefined,
+          null,
+          0
+        );
+      }
+
+      if (request.setting.options.unfocus) {
+        await chrome.windows.update(currentWindow.id, { focused: true });
+      }
+      break;
+    }
+
+    case 'tabs': {
+      const tab = await chrome.tabs.get(sender.tab.id);
+      const window = await chrome.windows.getCurrent();
+      const tabIndex = !request.setting.options.end ? tab.index + 1 : null;
+
+      await openTab(
+        request.urls,
+        request.setting.options.delay,
+        window.id,
+        tab.id,
+        tabIndex,
+        request.setting.options.close
+      );
+      break;
+    }
+
+    default:
+      throw new Error('Unknown action type');
+  }
 }

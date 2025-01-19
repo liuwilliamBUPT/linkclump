@@ -1,4 +1,6 @@
-var config = {
+import $ from 'jquery';
+
+let config = {
   triggers: [{ name: 'Left' }, { name: 'Middle' }, { name: 'Right' }],
   actions: {
     win: {
@@ -81,11 +83,11 @@ var config = {
   },
 };
 
-var OS_WIN = 0;
-var OS_LINUX = 1;
-var OS_MAC = 2;
+let OS_WIN = 0;
+let OS_LINUX = 1;
+let OS_MAC = 2;
 
-var colors = [
+let colors = [
   '458B74',
   '838B8B',
   'CCCCCC',
@@ -117,10 +119,10 @@ var colors = [
   '8E388E',
   'FFFF00',
 ];
-var params = null;
-var div_history = [];
-var keys = displayKeys(0);
-var os =
+let params = null;
+let div_history = [];
+let keys = displayKeys(0);
+let os =
   navigator.appVersion.indexOf('Win') === -1
     ? navigator.appVersion.indexOf('Mac') === -1
       ? OS_LINUX
@@ -159,7 +161,7 @@ function load_action(id) {
       '#' + colors[Math.floor(Math.random() * colors.length)]
     );
   } else {
-    var param = params.actions[id];
+    let param = params.actions[id];
     $('#form_id').val(id);
 
     $('#form_mouse').val(param.mouse);
@@ -172,7 +174,7 @@ function load_action(id) {
 
     displayOptions(param.action);
 
-    for (var i in param.options) {
+    for (let i in param.options) {
       switch (config.options[i].type) {
         case 'selection':
           $('#form_option_' + i).val(param.options[i]);
@@ -192,9 +194,9 @@ function load_action(id) {
 
         case 'selection-textbox':
           if (param.options[i].length > 1) {
-            var selection = param.options[i][0];
-            var text = '';
-            for (var k = 1; k < param.options[i].length; k++) {
+            let selection = param.options[i][0];
+            let text = '';
+            for (let k = 1; k < param.options[i].length; k++) {
               text += param.options[i][k] + ',';
             }
 
@@ -222,8 +224,8 @@ function load_action(id) {
 
 function delete_action(id, div) {
   div.fadeOut('swing', function () {
-    var del = $("<div class='undo'>Action has been deleted </div>");
-    var undo = $('<a>undo</a>').click(
+    let del = $("<div class='undo'>Action has been deleted </div>");
+    let undo = $('<a>undo</a>').click(
       { i: id, param: params.actions[id] },
       function (event) {
         div_history[event.data.i].replaceWith(
@@ -249,7 +251,7 @@ function delete_action(id, div) {
 }
 
 function setup_action(param, id) {
-  var setting = $("<div class='setting' id='action_" + id + "'>");
+  let setting = $("<div class='setting' id='action_" + id + "'>");
 
   setting.append('<h3>' + config.actions[param.action].name + '</h3>');
   setting.append(
@@ -259,10 +261,12 @@ function setup_action(param, id) {
     setting.append(' and "' + keys[param.key] + '" key ');
   }
 
-  var list = $('<ul>');
-  for (var j in param.options) {
-    var op = config.options[j];
-    var text = op.name + ': ';
+  let list = $('<ul>');
+  for (let j in param.options) {
+    let op = config.options[j];
+    let text = op.name + ': ';
+    let selection;
+    let words;
     switch (op.type) {
       case 'selection':
         text += op.data[param.options[j]];
@@ -284,9 +288,9 @@ function setup_action(param, id) {
         if (param.options[j].length < 2) {
           continue;
         }
-        var selection = param.options[j][0];
-        var words = '';
-        for (var i = 1; i < param.options[j].length; i++) {
+        selection = param.options[j][0];
+        words = '';
+        for (let i = 1; i < param.options[j].length; i++) {
           words += param.options[j][i];
 
           if (i < param.options[j].length - 1) {
@@ -307,7 +311,7 @@ function setup_action(param, id) {
 
   setting.append(list);
 
-  var edit = $("<a href='#' class='button edit'>Edit</a>").click(
+  let edit = $("<a href='#' class='button edit'>Edit</a>").click(
     { i: id },
     function (event) {
       load_action(event.data.i, $(this).parent().parent());
@@ -315,7 +319,7 @@ function setup_action(param, id) {
     }
   );
 
-  var del = $("<a href='#' class='button delete'>Delete</a>").click(
+  let del = $("<a href='#' class='button delete'>Delete</a>").click(
     { i: id },
     function (event) {
       delete_action(event.data.i, $(this).parent());
@@ -330,8 +334,8 @@ function setup_action(param, id) {
 }
 
 function setup_form() {
-  var mouse = $('#form_mouse');
-  for (var i = 0; i < config.triggers.length; i++) {
+  let mouse = $('#form_mouse');
+  for (let i = 0; i < config.triggers.length; i++) {
     mouse.append(
       '<option value="' + i + '">' + config.triggers[i].name + '</option>'
     );
@@ -342,8 +346,8 @@ function setup_form() {
     check_selection();
   });
 
-  var color = $('#form_color');
-  for (var i in colors) {
+  let color = $('#form_color');
+  for (let i in colors) {
     color.append(
       "<option value='" + colors[i] + "'>" + colors[i] + '</option>'
     );
@@ -354,9 +358,9 @@ function setup_form() {
     hide: false,
   });
 
-  var action = $('#form_action');
-  for (var i in config.actions) {
-    var act = $(
+  let action = $('#form_action');
+  for (let i in config.actions) {
+    let act = $(
       '<input type="radio" name="action" value="' +
         i +
         '" id="form_' +
@@ -377,8 +381,8 @@ function setup_form() {
 }
 
 function setup_text(keys) {
-  var param;
-  for (var i in params.actions) {
+  let param;
+  for (let i in params.actions) {
     param = params.actions[i];
     break;
   }
@@ -395,11 +399,11 @@ function setup_text(keys) {
 }
 
 function check_selection() {
-  var m = $('#form_mouse').val();
-  var k = $('#form_key').val();
-  var id = $('#form_id').val();
+  let m = $('#form_mouse').val();
+  let k = $('#form_key').val();
+  let id = $('#form_id').val();
 
-  var keyWarning = $('#key_warning');
+  let keyWarning = $('#key_warning');
   keyWarning.empty();
   if (k === '0') {
     keyWarning.append(
@@ -414,7 +418,7 @@ function check_selection() {
     }
   }
 
-  for (var i in params.actions) {
+  for (let i in params.actions) {
     // not sure if mouse/key are strings or ints
     if (i != id && params.actions[i].mouse == m && params.actions[i].key == k) {
       if ($('.warning').is(':hidden')) {
@@ -431,21 +435,21 @@ function check_selection() {
 }
 
 function displayOptions(action) {
-  var options = $('#form_options');
+  let options = $('#form_options');
   options.empty();
 
-  for (var i in config.actions[action].options) {
-    var op = config.options[config.actions[action].options[i]];
-    var title = $('<label>' + op.name + '</label>');
-    var p = $('<p />');
+  for (let i in config.actions[action].options) {
+    let op = config.options[config.actions[action].options[i]];
+    let title = $('<label>' + op.name + '</label>');
+    let p = $('<p />');
     p.append(title);
-
+    let selector;
     switch (op.type) {
       case 'selection':
-        var selector = $(
+        selector = $(
           "<select id='form_option_" + config.actions[action].options[i] + "'>"
         );
-        for (var j in op.data) {
+        for (let j in op.data) {
           selector.append(
             '<option value="' + j + '">' + op.data[j] + '</option>'
           );
@@ -474,12 +478,12 @@ function displayOptions(action) {
         break;
 
       case 'selection-textbox':
-        var selector = $(
+        selector = $(
           "<select id='form_option_selection_" +
             config.actions[action].options[i] +
             "'>"
         );
-        for (var j in op.data) {
+        for (let j in op.data) {
           selector.append(
             '<option value="' + j + '">' + op.data[j] + '</option>'
           );
@@ -497,7 +501,7 @@ function displayOptions(action) {
     }
 
     p.mouseover({ extra: op.extra }, function (event) {
-      var extra = $('#form_extra');
+      let extra = $('#form_extra');
       extra.html(event.data.extra);
       extra.css('top', $(this).position().top);
       extra.css('left', $(this).position().left + 500);
@@ -511,9 +515,9 @@ function displayOptions(action) {
 }
 
 function displayKeys(mouseButton) {
-  var key = $('#form_key');
+  let key = $('#form_key');
   key.empty();
-  var keys = [];
+  let keys = [];
 
   keys[16] = 'shift';
   keys[17] = 'ctrl';
@@ -529,11 +533,11 @@ function displayKeys(mouseButton) {
   }
 
   // add on alpha characters
-  for (var i = 0; i < 26; i++) {
+  for (let i = 0; i < 26; i++) {
     keys[65 + i] = String.fromCharCode(97 + i);
   }
 
-  for (var i in keys) {
+  for (let i in keys) {
     key.append('<option value="' + i + '">' + keys[i] + '</option>');
   }
 
@@ -549,9 +553,9 @@ function load_new_action(event) {
 }
 
 function save_action(event) {
-  var id = $('#form_id').val();
+  let id = $('#form_id').val();
 
-  var param = {};
+  let param = {};
 
   param.mouse = $('#form_mouse').val();
   param.key = $('#form_key').val();
@@ -559,14 +563,14 @@ function save_action(event) {
   param.action = $('input[name=action]:radio:checked').val();
   param.options = {};
 
-  for (var opt in config.actions[param.action].options) {
-    var name = config.actions[param.action].options[opt];
-    var type = config.options[name].type;
+  for (let opt in config.actions[param.action].options) {
+    let name = config.actions[param.action].options[opt];
+    let type = config.options[name].type;
     if (type === 'checkbox') {
       param.options[name] = $('#form_option_' + name).is(':checked');
     } else {
       if (name === 'ignore') {
-        var ignore = $('#form_option_text_' + name)
+        let ignore = $('#form_option_text_' + name)
           .val()
           .replace(/^ */, '')
           .replace(/, */g, ',')
@@ -583,7 +587,7 @@ function save_action(event) {
 
         param.options[name] = ignore;
       } else if (name === 'delay' || name === 'close') {
-        var delay;
+        let delay;
         try {
           delay = parseFloat($('#form_option_' + name).val());
         } catch (err) {
@@ -601,14 +605,14 @@ function save_action(event) {
   }
 
   if (id === '' || params.actions[id] === null) {
-    var newDate = new Date();
+    let newDate = new Date();
     id = newDate.getTime();
 
     params.actions[id] = param;
     $('#settings').append(setup_action(param, id));
   } else {
     params.actions[id] = param;
-    var update = setup_action(param, id);
+    let update = setup_action(param, id);
     $('#action_' + id).replaceWith(update);
   }
 
@@ -617,7 +621,7 @@ function save_action(event) {
 }
 
 function save_params() {
-  chrome.extension.sendMessage({
+  chrome.runtime.sendMessage({
     message: 'update',
     settings: params,
   });
@@ -625,7 +629,7 @@ function save_params() {
 
 function save_block() {
   // replace any whitespace at end to stop empty site listings
-  var sites = $('#form_block')
+  let sites = $('#form_block')
     .val()
     .replace(/^\s+|\s+$/g, '')
     .split('\n');
@@ -637,7 +641,7 @@ function save_block() {
 }
 
 $(function () {
-  var isFirstTime = window.location.href.indexOf('init=true') > -1;
+  let isFirstTime = window.location.href.indexOf('init=true') > -1;
 
   // temp check to not load if in test mode
   if (document.getElementById('guide2') === null) {
@@ -656,14 +660,14 @@ $(function () {
 
   setup_form();
 
-  chrome.extension.sendMessage(
+  chrome.runtime.sendMessage(
     {
       message: 'init',
     },
     function (response) {
       params = response;
 
-      for (var i in params.actions) {
+      for (let i in params.actions) {
         $('#settings').append(setup_action(params.actions[i], i));
       }
       setup_text(keys);
