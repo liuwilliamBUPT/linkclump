@@ -1,0 +1,19 @@
+const END_KEYCODE = 35;
+const HOME_KEYCODE = 36;
+const Z_INDEX = 2147483647;
+const OS_WIN = 1;
+const OS_LINUX = 0;
+const LEFT_BUTTON = 0;
+const EXCLUDE_LINKS = 0;
+const INCLUDE_LINKS = 1;
+
+export {
+  END_KEYCODE,
+  HOME_KEYCODE,
+  Z_INDEX,
+  OS_WIN,
+  OS_LINUX,
+  LEFT_BUTTON,
+  EXCLUDE_LINKS,
+  INCLUDE_LINKS,
+};

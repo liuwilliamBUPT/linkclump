@@ -1,18 +1,25 @@
 {
   "manifest_version": 3,
-  "name": "linkclump",
+  "name": "linkclump-vue",
   "version": "1.0.0",
   "action": { "default_popup": "index.html" },
   "host_permissions": [
     "*://*/*"
   ],
-  "permissions": ["activeTab", "scripting"],
+  "permissions": ["activeTab", "scripting", "storage"],
   "icons": {
     "16": "images/16x16.png",
     "48": "images/48x48.png",
     "128": "images/128x128.png"
   },
   "background": {
-    "service_worker": "src/background/index.ts"
-  }
+    "service_worker": "src/background/index.ts",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/main.ts"]
+    }
+  ]
 }

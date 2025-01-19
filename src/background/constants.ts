@@ -1,0 +1,14 @@
+const CURRENT_VERSION = '6';
+
+// link copy format
+enum CopyFormat {
+  URLS_WITH_TITLES,
+  URLS_ONLY,
+  URLS_ONLY_SPACE_SEPARATED,
+  TITLES_ONLY,
+  AS_LINK_HTML,
+  AS_LIST_LINK_HTML,
+  AS_MARKDOWN,
+}
+
+export { CURRENT_VERSION, CopyFormat };
