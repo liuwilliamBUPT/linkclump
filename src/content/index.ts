@@ -157,14 +157,14 @@ function preventEscalation(event: MouseEvent) {
 }
 
 function updateBox(x: number, y: number) {
-  var width = Math.max(
+  let width = Math.max(
     document.documentElement['clientWidth'],
     document.body['scrollWidth'],
     document.documentElement['scrollWidth'],
     document.body['offsetWidth'],
     document.documentElement['offsetWidth']
   ); // taken from jquery
-  var height = Math.max(
+  let height = Math.max(
     document.documentElement['clientHeight'],
     document.body['scrollHeight'],
     document.documentElement['scrollHeight'],
@@ -176,6 +176,7 @@ function updateBox(x: number, y: number) {
 
   const { box, countLabel } = runtimeContext;
   if (box && countLabel) {
+    // debugger;
     if (x > (box?.x ?? 0)) {
       box.x1 = box.x;
       box.x2 = x;
@@ -246,7 +247,7 @@ function start() {
 
   // find all links (find them each time as they could have moved)
   const pageLinks = document.links as HTMLCollectionOf<LinkURL>;
-
+  debugger;
   // create RegExp once
   const re1 = new RegExp('^javascript:', 'i');
   const re2 = new RegExp(

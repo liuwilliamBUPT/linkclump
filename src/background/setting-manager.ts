@@ -1,86 +1,79 @@
-import type { Settings } from './types';
+import type { Settings, Action } from './types';
 import { CURRENT_VERSION } from './constants';
 
 class SettingManager {
   private static instance: SettingManager;
-  private settings: Settings | undefined;
+  private settings: Settings | null = null;
 
-  constructor() {
-    if (SettingManager.instance == null) {
-      SettingManager.instance = this;
-      this.init();
-    } else {
-      return SettingManager.instance;
-    }
+  private constructor() {}
+
+  private getDefaultSettings(): Settings {
+    return {
+      actions: {
+        '101': {
+          mouse: 0, // left mouse button
+          key: 90, // z key
+          type: 'tabs',
+          action: 'tabs',
+          color: '#FFA500',
+          options: {
+            smart: 0,
+            ignore: [0],
+            delay: 0,
+            close: 0,
+            block: true,
+            reverse: false,
+            end: false,
+          },
+        },
+      },
+      blocked: [],
+    };
   }
 
   async init() {
-    chrome.storage.local
-      .get('settings')
-      .then((data) => {
-        if (data.settings) {
-          this.settings = data.settings;
-        } else {
-          this.settings = {
-            actions: {
-              '101': {
-                mouse: 0, // left mouse button
-                key: 90, // z key
-                type: 'tabs',
-                action: 'tabs',
-                color: '#FFA500',
-                options: {
-                  smart: 0,
-                  ignore: [0],
-                  delay: 0,
-                  close: 0,
-                  block: true,
-                  reverse: false,
-                  end: false,
-                },
-              },
-            },
-            blocked: [],
-          };
-        }
-      })
-      .catch((error) => {
-        this.settings = {
-          actions: {
-            '101': {
-              mouse: 0, // left mouse button
-              key: 90, // z key
-              type: 'tabs',
-              action: 'tabs',
-              color: '#FFA500',
-              options: {
-                smart: 0,
-                ignore: [0],
-                delay: 0,
-                close: 0,
-                block: true,
-                reverse: false,
-                end: false,
-              },
-            },
-          },
-          blocked: [],
-        };
-        this.settings.error = 'Error loading settings : ' + error;
-        chrome.storage.local.set({ settings: this.settings });
-        chrome.storage.local.set({ version: CURRENT_VERSION });
+    try {
+      const data = await chrome.storage.local.get(['settings', 'version']);
+      if (data.settings) {
+        this.settings = JSON.parse(data.settings);
+      } else {
+        this.settings = this.getDefaultSettings();
+        await chrome.storage.local.set({
+          settings: JSON.stringify(this.settings),
+          version: CURRENT_VERSION
+        });
+      }
+      return this.settings;
+    } catch (error) {
+      console.error('Error initializing settings:', error);
+      this.settings = this.getDefaultSettings();
+      await chrome.storage.local.set({
+        settings: JSON.stringify(this.settings),
+        version: CURRENT_VERSION
       });
+      return this.settings;
+    }
   }
 
-  getSettings() {
+  async getSettings() {
+    if (!this.settings) {
+      return this.init();
+    }
     return this.settings;
   }
 
-  saveSettings() {
-    if (this.settings?.error !== undefined) {
-      delete this.settings.error;
+  async saveAction(actionId: string, action: Action) {
+    if (!this.settings) {
+      await this.init();
     }
-    chrome.storage.local.set({ settings: this.settings });
+
+    if (this.settings) {
+      this.settings.actions[actionId] = action;
+      await chrome.storage.local.set({
+        settings: JSON.stringify(this.settings),
+        version: CURRENT_VERSION
+      });
+    }
   }
 
   async isInitialized() {
@@ -93,14 +86,8 @@ class SettingManager {
     return data.version === CURRENT_VERSION;
   }
 
-  async updateSettings() {
-    if (!this.isInitialized()) {
-      this.init();
-    }
-  }
-
-  static getInstance() {
-    if (SettingManager.instance == null) {
+  static getInstance(): SettingManager {
+    if (!SettingManager.instance) {
       SettingManager.instance = new SettingManager();
     }
     return SettingManager.instance;

@@ -26,12 +26,14 @@ export type Settings = {
   error?: string;
 };
 
-export type ActionType = 'activate' | 'init' | 'update';
+export type ActionType = 'activate' | 'init' | 'update' | 'updateAction';
 
 export type Message = {
   type: ActionType;
-  action: Action;
-  urls: LinkURL[];
+  actionId?: string;
+  action?: Action;
+  settings?: Settings;
+  urls?: LinkURL[];
 };
 
 export type LinkURL = {

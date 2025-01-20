@@ -8,6 +8,8 @@ const handleMessage = (
   _sender: chrome.runtime.MessageSender,
   sendResponse: (response?: any) => void
 ) => {
+  const settingManager = SettingManager.getInstance();
+
   switch (message.type) {
     case 'activate':
       if (message.action.options.block) {
@@ -36,35 +38,61 @@ const handleMessage = (
 
       break;
     case 'init':
-      SettingManager.getInstance()
-        .init()
-        .then(() => {
-          sendResponse(SettingManager.getInstance().getSettings());
+      settingManager.getSettings()
+        .then(settings => {
+          console.log('Sending settings:', settings);
+          sendResponse(settings);
+        })
+        .catch(error => {
+          console.error('Failed to get settings:', error);
+          sendResponse(null);
         });
-
-      break;
+      return true;
     case 'update':
+      SettingManager.getInstance().saveSettings(message.settings);
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach((tab) => {
+          if (tab.id) {
+            chrome.tabs.sendMessage(tab.id, {
+              type: 'settingsUpdated',
+              settings: message.settings,
+            }).catch(() => {
+              // 忽略不能发送消息的标签页
+            });
+          }
+        });
+      });
+      sendResponse({ success: true });
+      break;
+    case 'updateAction':
+      if (message.actionId && message.action) {
+        settingManager.saveAction(message.actionId, message.action)
+          .then(() => {
+            sendResponse({ success: true });
+          })
+          .catch(error => {
+            console.error('Failed to save action:', error);
+            sendResponse({ success: false, error: error.message });
+          });
+        return true;
+      }
       break;
   }
+
   return true;
 };
 
-const init = async () => {
-  if (!SettingManager.getInstance().isInitialized()) {
-    SettingManager.getInstance().init();
-    // open popup page
-    chrome.runtime.openOptionsPage();
-  } else if (!SettingManager.getInstance().isLatestVersion()) {
-    SettingManager.getInstance().updateSettings();
-  }
+const initExtension = async () => {
+  const settingManager = SettingManager.getInstance();
+  await settingManager.init();
 };
 
 chrome.runtime.onInstalled.addListener(() => {
-  init();
+  initExtension();
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  init();
+  initExtension();
 });
 
 chrome.runtime.onMessage.addListener(handleMessage);
