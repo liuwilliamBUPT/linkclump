@@ -1,4 +1,4 @@
-import type { LinkURL, Settings } from '../background/types';
+import type { LinkURL, Message, Settings } from '../background/types';
 import {
   END_KEYCODE,
   EXCLUDE_LINKS,
@@ -140,6 +140,7 @@ function blur() {
 }
 
 function keyup(event: KeyboardEvent) {
+  debugger;
   if (event.keyCode != END_KEYCODE && event.keyCode != HOME_KEYCODE) {
     removeKey();
   }
@@ -211,7 +212,7 @@ function getXY(element: HTMLElement) {
   let matrix;
   do {
     style = window.getComputedStyle(parent);
-    matrix = new WebKitCSSMatrix(style.webkitTransform);
+    matrix = new WebKitCSSMatrix(style.transform);
     x += parent.offsetLeft + matrix.m41;
     y += parent.offsetTop + matrix.m42;
   } while ((parent = parent.offsetParent as HTMLElement));
@@ -247,7 +248,7 @@ function start() {
 
   // find all links (find them each time as they could have moved)
   const pageLinks = document.links as HTMLCollectionOf<LinkURL>;
-  debugger;
+  // debugger;
   // create RegExp once
   const re1 = new RegExp('^javascript:', 'i');
   const re2 = new RegExp(
@@ -276,9 +277,8 @@ function start() {
 
     // include/exclude links
     if (
-      runtimeContext.settings?.actions[runtimeContext.currentAction].options
-        .ignore.length ??
-      0 > 1
+      (runtimeContext.settings?.actions[runtimeContext.currentAction].options
+        .ignore.length ?? 0) > 1
     ) {
       if (re2.test(pageLinks[i].href) || re2.test(pageLinks[i].innerHTML)) {
         if (
@@ -348,7 +348,7 @@ function start() {
   }
 }
 
-function detech(x: number, y: number, open: boolean) {
+function detect(x: number, y: number, open: boolean) {
   runtimeContext.mouseX = x;
   runtimeContext.mouseY = y;
 
@@ -369,7 +369,7 @@ function detech(x: number, y: number, open: boolean) {
 
   let count = 0;
   const countTabs = new Set<string>();
-  const openTabs: LinkURL[] = [];
+  let openTabs: LinkURL[] = [];
   for (let i = 0; i < runtimeContext.links.length; i++) {
     if (
       (!runtimeContext.smartSelect || runtimeContext.links[i].important) &&
@@ -435,10 +435,22 @@ function detech(x: number, y: number, open: boolean) {
   }
 
   if (openTabs.length > 0) {
-    chrome.runtime.sendMessage({
+    openTabs = openTabs.map((tab) => ({
+      ...tab,
+      url: tab.href,
+      title: tab.title,
+    }));
+
+    chrome.runtime.sendMessage<Message>({
       type: 'activate',
       urls: openTabs,
-      setting: runtimeContext.settings?.actions[runtimeContext.currentAction],
+      settings: {
+        actions: {
+          [runtimeContext.currentAction]:
+            runtimeContext.settings?.actions[runtimeContext.currentAction]!,
+        },
+        blocked: [],
+      },
     });
   }
 
@@ -453,7 +465,7 @@ function mousemove(event: MouseEvent) {
     updateBox(event.pageX, event.pageY);
 
     // while detect keeps on calling false then recall the method
-    while (!detech(event.pageX, event.pageY, false)) {
+    while (!detect(event.pageX, event.pageY, false)) {
       // empty
     }
   } else if (runtimeContext.timer === 0) {
@@ -465,11 +477,12 @@ function mouseup(event: MouseEvent) {
   preventEscalation(event);
 
   if (runtimeContext.boxOn) {
+    debugger;
     // all the detection of the mouse to bounce
     if (allowSelection() && runtimeContext.timer === 0) {
       runtimeContext.timer = setTimeout(function () {
         updateBox(event.pageX, event.pageY);
-        detech(event.pageX, event.pageY, true);
+        detect(event.pageX, event.pageY, true);
 
         stop();
         runtimeContext.timer = 0;
@@ -600,3 +613,27 @@ chrome.runtime.sendMessage({ type: 'init' }, function (response: Settings) {
   }
   console.log('Linkclump loaded');
 });
+
+function stop() {
+  // allow user to select text/elements
+  document.body.style.userSelect = '';
+
+  // turn off mouse move and mouse up
+  window.removeEventListener('mousemove', mousemove, true);
+  window.removeEventListener('mouseup', mouseup, true);
+  window.removeEventListener('mousewheel', mousewheel, true);
+  window.removeEventListener('mouseout', mouseout, true);
+
+  if (runtimeContext.boxOn) {
+    cleanUp();
+  }
+
+  // turn on menu for linux
+  if (
+    OS_LINUX &&
+    runtimeContext.settings?.actions[runtimeContext.currentAction].key !=
+      runtimeContext.keyPressed
+  ) {
+    runtimeContext.stopMenu = false;
+  }
+}
