@@ -12,26 +12,26 @@ const handleMessage = (
 
   switch (message.type) {
     case 'activate':
-      let urls: LinkURL[] = message.urls ?? [];
-      if (urls.length === 0) {
-        return;
-      }
+      // let urls: LinkURL[] = message.urls ?? [];
+      // if (urls.length === 0) {
+      //   return;
+      // }
 
-      if (message.action?.options.block) {
-        urls = uniqueLinkURLs(urls);
-      }
+      // if (message.action?.options.block) {
+      //   urls = uniqueLinkURLs(urls);
+      // }
 
-      if (message.action?.options.reverse) {
-        urls.reverse();
-      }
+      // if (message.action?.options.reverse) {
+      //   urls.reverse();
+      // }
 
       switch (message.action?.type) {
         case 'copy':
-          const text = formatLinks(
-            urls,
-            message.action.options.copyFormat ?? CopyFormat.URLS_WITH_TITLES
-          );
-          copyToClipboard(text);
+          // const text = formatLinks(
+          //   urls,
+          //   message.action.options.copyFormat ?? CopyFormat.URLS_WITH_TITLES
+          // );
+          // copyToClipboard(text);
           break;
         case 'bookmark':
           break;

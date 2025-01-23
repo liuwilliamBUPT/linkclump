@@ -1,4 +1,6 @@
+import { CopyFormat } from '../background/constants';
 import type { LinkURL, Message, Settings } from '../background/types';
+import { formatLinks, uniqueLinkURLs } from '../background/utils';
 import {
   END_KEYCODE,
   EXCLUDE_LINKS,
@@ -140,7 +142,6 @@ function blur() {
 }
 
 function keyup(event: KeyboardEvent) {
-  debugger;
   if (event.keyCode != END_KEYCODE && event.keyCode != HOME_KEYCODE) {
     removeKey();
   }
@@ -177,7 +178,6 @@ function updateBox(x: number, y: number) {
 
   const { box, countLabel } = runtimeContext;
   if (box && countLabel) {
-    // debugger;
     if (x > (box?.x ?? 0)) {
       box.x1 = box.x;
       box.x2 = x;
@@ -248,7 +248,6 @@ function start() {
 
   // find all links (find them each time as they could have moved)
   const pageLinks = document.links as HTMLCollectionOf<LinkURL>;
-  // debugger;
   // create RegExp once
   const re1 = new RegExp('^javascript:', 'i');
   const re2 = new RegExp(
@@ -441,6 +440,41 @@ function detect(x: number, y: number, open: boolean) {
       title: tab.title,
     }));
 
+    if (openTabs.length === 0) {
+      return;
+    }
+
+    // if (message.action?.options.block) {
+    //   urls = uniqueLinkURLs(urls);
+    // }
+
+    if (
+      runtimeContext.settings?.actions[runtimeContext.currentAction]?.options
+        .reverse
+    ) {
+      openTabs.reverse();
+    }
+
+    if (
+      runtimeContext.settings?.actions[runtimeContext.currentAction]?.type ===
+      'copy'
+    ) {
+      const text = formatLinks(
+        openTabs,
+        runtimeContext.settings?.actions[runtimeContext.currentAction]?.options
+          .copyFormat ?? CopyFormat.URLS_WITH_TITLES
+      );
+      window.focus();
+      navigator.clipboard
+        .writeText(text)
+        .then(() => {
+          console.log('Text copied!');
+        })
+        .catch((err) => {
+          console.error('Failed to copy text:', err);
+        });
+    }
+
     chrome.runtime.sendMessage<Message>({
       type: 'activate',
       urls: openTabs,
@@ -477,7 +511,6 @@ function mouseup(event: MouseEvent) {
   preventEscalation(event);
 
   if (runtimeContext.boxOn) {
-    debugger;
     // all the detection of the mouse to bounce
     if (allowSelection() && runtimeContext.timer === 0) {
       runtimeContext.timer = setTimeout(function () {
