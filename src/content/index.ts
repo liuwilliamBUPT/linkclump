@@ -397,7 +397,7 @@ function detect(x: number, y: number, open: boolean) {
 
       if (runtimeContext.links[i].box === null) {
         const linkBox = document.createElement('span');
-        linkBox.id = 'linkclump-link';
+        linkBox.className = 'linkclump-link';
         linkBox.style.margin = '0px auto';
         linkBox.style.border = '1px solid red';
         linkBox.style.position = 'absolute';
